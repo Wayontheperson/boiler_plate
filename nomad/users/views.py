@@ -1,12 +1,13 @@
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.exceptions import ParseError, NotFound
 from . import serializers
 
-from django.urls import reverse_lazy
-from django.views import generic
-from .forms import CustomrUserCreationForm
+import jwt
+from django.contrib.auth import authenticate
+from django.conf import settings
+
 # Create your views here.
 
 class Me(APIView):
@@ -33,9 +34,23 @@ class Me(APIView):
             return Response(serializer.errors)
         
 
-
-
-class SignUpView(generic.CreateView):
-    form_class = CustomrUserCreationForm
-    success_url = reverse_lazy('login')
-    template_name = 'users/signup.html'
+class JWTLogIn(APIView):
+    def post(self, request):
+        username = request.data.get("username")
+        password = request.data.get("password")
+        if not username or not password:
+            raise ParseError
+        user = authenticate(
+            request,
+            username=username,
+            password=password,
+        )
+        if user:
+            token = jwt.encode(
+                {"pk": user.pk},
+                settings.SECRET_KEY,
+                algorithm="HS256",
+            )
+            return Response({"token": token})
+        else:
+            return Response({"error": "wrong password"})
